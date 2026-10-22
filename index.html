@@ -1,0 +1,172 @@
+// ==========================================
+// GEMINI API & DYNAMIC VISUAL ENGINE
+// ==========================================
+
+// 1. Local persistence for Gemini API Key with visual feedback
+function saveApiKey() {
+  const input = document.getElementById('gemini-api-key');
+  const key = input.value.trim();
+  if (!key) return;
+
+  localStorage.setItem('focus_os_gemini_key', key);
+
+  // Micro-interaction: Visual flash confirmation on the input border
+  input.classList.add('border-emerald-400', 'shadow-[0_0_15px_rgba(16,185,129,0.35)]');
+  setTimeout(() => {
+    input.classList.remove('border-emerald-400', 'shadow-[0_0_15px_rgba(16,185,129,0.35)]');
+  }, 1200);
+
+  alert('Gemini API Key saved locally!');
+}
+
+// Auto-fill saved key on reload
+const storedApiKey = localStorage.getItem('focus_os_gemini_key');
+if (storedApiKey && document.getElementById('gemini-api-key')) {
+  document.getElementById('gemini-api-key').value = storedApiKey;
+}
+
+// 2. Call Google Gemini API with Shimmer, Pulse & Typing Stream Visuals
+async function callGemini(promptText, activeBtn) {
+  const apiKey = document.getElementById('gemini-api-key').value.trim() || localStorage.getItem('focus_os_gemini_key');
+  if (!apiKey) {
+    alert('Please enter and save your Gemini API Key first.');
+    return null;
+  }
+
+  const outputBox = document.getElementById('ai-output-box');
+  outputBox.classList.remove('hidden');
+
+  // Visual Effect 1: Button Loading Glow & Spin Indicator
+  let originalBtnHtml = '';
+  if (activeBtn) {
+    originalBtnHtml = activeBtn.innerHTML;
+    activeBtn.disabled = true;
+    activeBtn.classList.add('opacity-75', 'cursor-not-allowed', 'ring-2', 'ring-cyan-400/50');
+    activeBtn.innerHTML = `
+      <i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin text-cyan-300"></i>
+      <span>Thinking...</span>
+    `;
+    lucide.createIcons();
+  }
+
+  // Visual Effect 2: Glassmorphic Shimmer & Skeleton Pulse in Output Box
+  outputBox.innerHTML = `
+    <div class="space-y-3 py-1">
+      <div class="flex items-center gap-2 text-cyan-400 text-xs font-mono">
+        <span class="relative flex h-2 w-2">
+          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+          <span class="relative inline-flex rounded-full h-2 w-2 bg-cyan-500"></span>
+        </span>
+        <span class="tracking-wide">Gemini 1.5 Flash is synthesizing...</span>
+      </div>
+      <!-- Shimmer skeleton bars -->
+      <div class="w-full h-2 rounded bg-slate-800/80 overflow-hidden relative">
+        <div class="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-400/30 to-transparent -translate-x-full animate-[shimmer_1.5s_infinite]"></div>
+      </div>
+      <div class="w-4/5 h-2 rounded bg-slate-800/80 overflow-hidden relative">
+        <div class="absolute inset-0 bg-gradient-to-r from-transparent via-purple-400/30 to-transparent -translate-x-full animate-[shimmer_1.5s_infinite]"></div>
+      </div>
+      <div class="w-3/5 h-2 rounded bg-slate-800/80 overflow-hidden relative">
+        <div class="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-400/30 to-transparent -translate-x-full animate-[shimmer_1.5s_infinite]"></div>
+      </div>
+    </div>
+  `;
+
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+  try {
+    const res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: promptText }] }]
+      })
+    });
+
+    const data = await res.json();
+    if (data.candidates && data.candidates[0].content.parts[0].text) {
+      return data.candidates[0].content.parts[0].text;
+    } else {
+      throw new Error(data.error?.message || 'Unexpected API response format');
+    }
+  } catch (err) {
+    outputBox.innerHTML = `
+      <div class="flex items-center gap-2 text-rose-400 border border-rose-900/50 p-2.5 rounded-lg bg-rose-950/20 font-mono text-xs">
+        <i data-lucide="alert-triangle" class="w-4 h-4 text-rose-400 flex-shrink-0"></i>
+        <span>Error: ${err.message}</span>
+      </div>
+    `;
+    lucide.createIcons();
+    return null;
+  } finally {
+    // Reset Button State
+    if (activeBtn) {
+      activeBtn.disabled = false;
+      activeBtn.classList.remove('opacity-75', 'cursor-not-allowed', 'ring-2', 'ring-cyan-400/50');
+      activeBtn.innerHTML = originalBtnHtml;
+      lucide.createIcons();
+    }
+  }
+}
+
+// Visual Effect 3: Typewriter Text Animation with Glowing Caret
+function renderTypewriterText(targetElement, fullText) {
+  targetElement.innerHTML = '';
+  let i = 0;
+  const speed = 7; // milliseconds per character
+
+  const textNode = document.createElement('span');
+  const cursorNode = document.createElement('span');
+  cursorNode.className = 'inline-block w-1.5 h-3.5 bg-cyan-400 ml-0.5 animate-pulse align-middle';
+
+  targetElement.appendChild(textNode);
+  targetElement.appendChild(cursorNode);
+
+  function typeChar() {
+    if (i < fullText.length) {
+      textNode.textContent += fullText.charAt(i);
+      i++;
+      setTimeout(typeChar, speed);
+    } else {
+      // Remove cursor after finished typing
+      setTimeout(() => cursorNode.remove(), 800);
+    }
+  }
+  typeChar();
+}
+
+// 3. Action: Generate Flashcards with Visual Triggers
+async function generateAIFlashcards(event) {
+  const noteBody = document.getElementById('note-body-input').value.trim();
+  if (!noteBody) {
+    alert('Please write or paste some notes in the editor first!');
+    return;
+  }
+
+  const btn = event ? event.currentTarget : null;
+  const prompt = `Based on the following study notes, generate 3 clear, high-yield Q&A flashcards in clean bullet points:\n\n${noteBody}`;
+  const response = await callGemini(prompt, btn);
+
+  if (response) {
+    const outputBox = document.getElementById('ai-output-box');
+    renderTypewriterText(outputBox, response);
+  }
+}
+
+// 4. Action: Summarize Notes with Visual Triggers
+async function generateAISummary(event) {
+  const noteBody = document.getElementById('note-body-input').value.trim();
+  if (!noteBody) {
+    alert('Please write or paste some notes in the editor first!');
+    return;
+  }
+
+  const btn = event ? event.currentTarget : null;
+  const prompt = `Summarize these study notes into 3 concise high-yield takeaways and 1 key question to test understanding:\n\n${noteBody}`;
+  const response = await callGemini(prompt, btn);
+
+  if (response) {
+    const outputBox = document.getElementById('ai-output-box');
+    renderTypewriterText(outputBox, response);
+  }
+}
